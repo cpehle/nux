@@ -104,7 +104,7 @@ module Pu_v2
 		
 		Pu_ctrl_if.pu           ctrl,
 		Timer_if.pu             timer,
-
+		// Note: Those two interfaces are deprecated.
 		Syn_io_if.client        syn_io_a,
 		Syn_io_if.client        syn_io_b
 	);
@@ -495,15 +495,16 @@ endgenerate
 //assign resbus.res = res;
 //always_comb resbus.set_res(res);
 
+   const int id_fxdpt = fu_set_id(FUB_FIXEDPOINT);
+   const int id_ls = fu_set_id(FUB_LOAD_STORE);
+   const int id_branch = fu_set_id(FUB_BRANCH);
+   const int id_mul_div = fu_set_id(FUB_MUL_DIV);
+   const int id_div = fu_set_id(FUB_DIV);
+   const int id_io = fu_set_id(FUB_IO);
+   const int id_never = fu_set_id(FUB_NEVER);
+   const int id_synapse = fu_set_id(FUB_SYNAPSE);
+
 always_comb begin
-	const int id_fxdpt = fu_set_id(FUB_FIXEDPOINT);
-	const int id_ls = fu_set_id(FUB_LOAD_STORE);
-	const int id_branch = fu_set_id(FUB_BRANCH);
-	const int id_mul_div = fu_set_id(FUB_MUL_DIV);
-	const int id_div = fu_set_id(FUB_DIV);
-	const int id_io = fu_set_id(FUB_IO);
-	const int id_never = fu_set_id(FUB_NEVER);
-	const int id_synapse = fu_set_id(FUB_SYNAPSE);
 	resbus.set_res(id_fxdpt, res[id_fxdpt]);
 	resbus.set_res(id_branch, res[id_branch]);
 	resbus.set_res(id_ls, res[id_ls]);

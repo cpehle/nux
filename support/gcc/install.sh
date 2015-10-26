@@ -66,13 +66,13 @@ patch -p0 <../binutils/binutils-2.25.patch
 cd ..
 
 echo "Building binutils-2.25"
-cd $WORK_DIR/binutils-2.25
+cd $WORK_DIR/downloads/binutils-2.25
 ./configure --prefix=$PREFIX --target=$TARGET && make || exit
 make install || exit
 
 echo "Building gcc-4.9.2"
-mkdir $WORK_DIR/gcc-build
-cd $WORK_DIR/gcc-build
+mkdir $WORK_DIR/downloads/gcc-build
+cd $WORK_DIR/downloads/gcc-build
 ../gcc-4.9.2/configure --prefix=$PREFIX --target=$TARGET --disable-shared --with-gnu-as --with-as=$PREFIX/bin/powerpc-linux-eabi-as --disable-multilib --disable-threads --disable-tls --enable-target-optspace --enable-languages=c --disable-libssp --disable-libquadmath --disable-libgomp --disable-lto && make -j2 || exit
 make install || exit
 

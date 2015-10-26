@@ -19,7 +19,6 @@ module Fub_branch
     input Pu_types::Word srr0, csrr0, mcsrr0,
     input Pu_types::Cr_bits cr,
     Operand_if.read opbus,
-
     output Backend::Result_bus resbus,
     output Frontend::Branch_control bctrl,
     Int_sched_if.trap except );
@@ -335,19 +334,19 @@ assign except.rest_mcheck = br_mcsrr0;
 assign pc_inc = inst.pc +1;
 
 
-assign resbus.valid = 1'b1;
+//assign resbus.valid = 1'b1;
 
 always_ff @(posedge clk)
-begin : reg_ctr
-  resbus.res_a <= next_ctr;
-  //resbus.res_b <= inst.npc;
-  resbus.res_b <= {pc_inc[$left(pc_inc)-2:0], 2'b00};
-
-  resbus.crf <= '0;
-  resbus.msr <= '0;
-  resbus.cout <= 1'b0;
-  resbus.ov <= 1'b0;
-end : reg_ctr
+  begin : reg_ctr
+     resbus.valid <= 1'b1;
+     resbus.res_a <= next_ctr;
+     //resbus.res_b <= inst.npc;
+     resbus.res_b <= {pc_inc[$left(pc_inc)-2:0], 2'b00};
+     resbus.crf <= '0;
+     resbus.msr <= '0;
+     resbus.cout <= 1'b0;
+     resbus.ov <= 1'b0;
+  end : reg_ctr
 
 //always_ff @(posedge clk or posedge reset)
   //if( reset ) begin

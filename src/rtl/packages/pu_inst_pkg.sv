@@ -330,8 +330,9 @@ package Pu_inst;
 		Inst_fxv fxv;
 	} Inst;
 
-	localparam Inst INST_NOP = Inst'({Op_ori, 26'b0});
-	localparam Inst INST_WAIT = Inst'({32'h7c_00_00_7c});
+	// localparam Inst INST_NOP = Inst'({Op_ori, 26'b0});
+   localparam Inst INST_NOP = Inst'({6'd24, 26'b0});
+   localparam Inst INST_WAIT = Inst'({32'h7c_00_00_7c});
 
 endpackage
 

@@ -115,7 +115,8 @@ module Valu
     unique case(conf)
       VALU_TYPE_FULL: rv = { {ELEM_SIZE{x[$left(x)]}}, x };
       VALU_TYPE_HALF: rv = {
-        {$bits(Vector_half_element){halfs[0][$left(Vector_half_element)]}},
+        // {$bits(Vector_half_element){halfs[0][$left(Vector_half_element)]}},
+       {$bits(Vector_half_element){halfs[0][$left(Vector_half_element)]}},
         halfs[0],
         {$bits(Vector_half_element){halfs[1][$left(Vector_half_element)]}},
         halfs[1]

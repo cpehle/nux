@@ -12,7 +12,7 @@
 import Pu_types::*;
 
 package Load_store_pkg;
-	typedef struct {
+	typedef struct packed {
 		logic en;
 		logic we;
 		Pu_types::Load_mode mode;

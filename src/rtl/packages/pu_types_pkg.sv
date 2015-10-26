@@ -415,34 +415,34 @@ package Pu_types;
 		MEM_BUS = 1
 	} Opt_mem;
 
-	function automatic logic[2:0] cr_idx_encode(input logic[7:0] sel);
-		logic[2:0] rv;
+   function automatic logic[2:0] cr_idx_encode;
+	  input logic [7:0] sel;
+	  logic [2:0] 	   rv;
+	  case(sel)
+		8'b00000001: rv = 3'h0;
+		8'b00000010: rv = 3'h1;
+		8'b00000100: rv = 3'h2;
+		8'b00001000: rv = 3'h3;
+		8'b00010000: rv = 3'h4;
+		8'b00100000: rv = 3'h5;
+		8'b01000000: rv = 3'h6;
+		8'b10000000: rv = 3'h7;
+		default:     rv = 3'hx;
+	  endcase
 
-		//unique case(sel)
-		case(sel)
-			8'b00000001: rv = 3'h0;
-			8'b00000010: rv = 3'h1;
-			8'b00000100: rv = 3'h2;
-			8'b00001000: rv = 3'h3;
-			8'b00010000: rv = 3'h4;
-			8'b00100000: rv = 3'h5;
-			8'b01000000: rv = 3'h6;
-			8'b10000000: rv = 3'h7;
-			default:     rv = 3'hx;
-		endcase
-
-		return rv;
+	  return rv;
 	endfunction
 
 
-	function automatic int clog2(input int x);
-		int rv, y;
-		y = 1;
-		for(rv=0; y < x; rv++) begin 
-			y = y * 2;
-		end
-		return rv;
-		//return $clog2(x);
+   function automatic int clog2;
+	  input int    x;
+	  int 		   rv, y;
+	  y = 1;
+	  for(rv=0; y < x; rv++) begin
+		 y = y * 2;
+	  end
+	  return rv;
+	  //return $clog2(x);
 	endfunction
 
 endpackage

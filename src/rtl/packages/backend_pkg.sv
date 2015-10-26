@@ -11,7 +11,7 @@
 
 package Backend;
   /** Bundles all signals that are fetched by operand fetch. */
-  typedef struct {
+  typedef struct packed {
     Pu_types::Word a;
     Pu_types::Word b;
     Pu_types::Word c;
@@ -27,7 +27,7 @@ package Backend;
   //const Operands operands_undef = { 32'bx, 32'bx, 32'bx, 1'bx, 32'bx };
 
   /** Bundles all result signals from functional units. */
-  typedef struct {
+  typedef struct packed {
     Pu_types::Word res_a;
     Pu_types::Word res_b;
     logic cout;

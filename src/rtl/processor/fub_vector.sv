@@ -199,7 +199,7 @@ module Fub_vector
     .pbus(pbus)
   );
 
-
+`ifndef VERILATOR
 `ifndef SYNTHESIS
 
   //--------------------------------------------------------------------------------
@@ -229,6 +229,8 @@ module Fub_vector
 
 
 `endif  /* !SYNTHESIS */
+`endif //  `ifndef VERILATOR
+
 
 endmodule
 

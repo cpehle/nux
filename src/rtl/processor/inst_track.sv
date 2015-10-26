@@ -9,457 +9,7 @@
 // under the License.
 
 
-module Inst_track
-  #(parameter bit WRITE_THROUGH = 1'b1,
-    parameter bit LOOKUP_CACHE = 1'b1 )
-  ( input logic clk, reset,
-    
-    input Frontend::Fetch_state fst,
-    input Frontend::Predecoded predec,
-    
-    input disable_wb,
 
-    output logic ready,
-    output logic pipe_empty,
-    input logic issue,
-    Wb_channel_if.ctrl wb_gpr,
-    Wb_channel_if.ctrl wb_cr,
-    Wb_channel_if.ctrl wb_ctr,
-    Wb_channel_if.ctrl wb_lnk,
-    Wb_channel_if.ctrl wb_xer,
-    Wb_channel_if.ctrl wb_spr,
-    Wb_channel_if.ctrl wb_msr,
-
-    input Frontend::Delayed_commit del_commit );
-    
-import Frontend::*;
-import Pu_types::*;
-
-
-    //Delayed_wb_if.inst_track wbd_ls_gpr );
-
-//---------------------------------------------------------------------------
-// Local types and signals
-//---------------------------------------------------------------------------
-
-localparam int shreg_stages = $bits(Inst_latency_onehot);
-localparam int shreg_stages_short = 4;
-
-Wb_channel_if wb_branch_dummy();
-Wb_channel_if wb_mem_dummy();
-Wb_channel_if wb_nve_dummy();
-
-logic shift;
-Reg_index ra, rb, rt;
-logic ready_gpr;
-logic ready_cr;
-logic ready_ctr;
-logic ready_lnk;
-logic ready_xer;
-logic ready_spr;
-logic ready_msr;
-//logic ready_ls_gpr_delayed;
-logic empty_gpr;
-logic empty_cr;
-logic empty_ctr;
-logic empty_lnk;
-logic empty_xer;
-logic empty_spr;
-logic empty_branch;
-logic empty_mem;
-logic empty_nve;
-logic empty_msr;
-
-logic found_ls_gpr_delayed_w;
-logic ready_ls_gpr_delayed_r[0:2];
-
-logic schedule_wb;
-
-
-assign shift = 1'b1;
-assign
-  ra = predec.ra,
-  rb = predec.rb,
-  rt = predec.rt;
-assign schedule_wb = ~predec.nd_latency;
-
-assign ready = ready_gpr 
-  & ready_cr 
-  & ready_ctr 
-  & ready_lnk 
-  & ready_xer
-  & ready_spr
-  & ready_msr;
-  //& ready_ls_gpr_delayed;
-
-assign pipe_empty = empty_gpr 
-  & empty_cr 
-  & empty_ctr 
-  & empty_lnk 
-  & empty_branch 
-  & empty_xer
-  & empty_spr
-  & empty_mem
-  //& empty_nve
-  & empty_msr;
-
-//---------------------------------------------------------------------------
-// XXX instruction delay counter to force execution in program order.
-// Alternatively implement this as a shift register.
-// (Perhaps make it configurable whether this is used.)
-//---------------------------------------------------------------------------
-
-
-//---------------------------------------------------------------------------
-// Result shift registers for write-back channels
-//---------------------------------------------------------------------------
-
-logic gpr_write;
-Reg_index gpr_dest;
-logic gpr_read[0:2];
-Reg_index gpr_read_dest[0:2];
-
-assign 
-  gpr_read_dest[0] = predec.ra,
-  gpr_read_dest[1] = predec.rb,
-  gpr_read_dest[2] = predec.rt;
-assign 
-  gpr_read[0] = predec.read_ra,
-  gpr_read[1] = predec.read_rb,
-  gpr_read[2] = predec.read_rt;
-
-assign gpr_write = (predec.write_ra | predec.write_rt);
-assign gpr_dest = predec.write_ra ? predec.ra : predec.rt;
-
-Track #(
-  .DEST_SIZE($bits(Reg_index)),
-  .NUM_TESTPORTS(3),
-  .SHREG_STAGES(shreg_stages),
-  .WRITE_THROUGH(WRITE_THROUGH),
-  //.WRITE_THROUGH(1'b0),
-  .USE_LOOKUP_CACHE(LOOKUP_CACHE)
-) track_gpr (
-  .write(gpr_write),
-  .dest(gpr_dest),
-  .read(gpr_read),
-  .read_dest(gpr_read_dest),
-  .ready(ready_gpr),
-  .empty(empty_gpr),
-  .wb(wb_gpr),
-  .delayed_commit(del_commit.valid),
-  .delayed_dest(del_commit.gpr),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-generate
-  wire [0:7] ready_crf;
-  wire [0:7] empty_crf;
-  wire [0:7] wb_crf_we;
-  Fu_set wb_crf_src[0:7];
-
-  //Wb_channel_if #(1) wb_crf [0:7] ();
-
-
-  /** generate trackers for every CR field */
-  genvar crf_i;
-  for(crf_i=0; crf_i<8; crf_i++) begin : gen_crf_track
-    logic cr_read[0:0];
-    logic cr_read_dest[0:0];
-
-    Wb_channel_if #(1) wb_crf();
-
-    assign cr_read[0] = predec.read_cr_0[crf_i]
-      | predec.read_cr_1[crf_i]
-      | predec.read_cr_2[crf_i];
-
-    assign cr_read_dest[0] = 1'b1;
-
-    Track #(
-      .DEST_SIZE(1),
-      .NUM_TESTPORTS(1),
-      .SHREG_STAGES(shreg_stages)
-    ) track_crf (
-      .write( (| predec.write_cr) ),
-      .dest(predec.write_cr[crf_i]),
-      .read(cr_read),
-      .read_dest(cr_read_dest),
-      .ready(ready_crf[crf_i]),
-      .empty(empty_crf[crf_i]),
-      //.wb(wb_crf[crf_i]),
-      .wb(wb_crf.ctrl),
-      .delayed_commit(1'b0),
-      .delayed_dest('0),
-      .predec(predec),
-      .*
-    );
-
-    //assign wb_cr.dest[crf_i] = wb_crf[crf_i].dest;
-    assign wb_cr.dest[crf_i] = wb_crf.dest;
-    assign wb_crf_we[crf_i] = wb_crf.we;
-    assign wb_crf_src[crf_i] = wb_crf.src;
-  end : gen_crf_track
-
-  assign ready_cr = (& ready_crf);
-  assign empty_cr = (& empty_crf);
-
-  /** control write back channel for CR */
-  always_comb begin
-    wb_cr.src = wb_crf_src[0];
-    wb_cr.we = 
-         wb_crf_we[0] | wb_crf_we[1] | wb_crf_we[2] | wb_crf_we[3]
-       | wb_crf_we[4] | wb_crf_we[5] | wb_crf_we[6] | wb_crf_we[7];
-  end
-
-endgenerate
-
-//---------------------------------------------------------------------------
-
-logic ctr_read[0:0];
-logic ctr_read_dest[0:0];
-
-assign ctr_read_dest[0] = 1'b0;
-assign ctr_read[0] = predec.read_ctr;
-
-Track #(
-  .DEST_SIZE(1),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages_short)
-) track_ctr (
-  .write(predec.write_ctr),
-  .dest(1'b0),
-  .read(ctr_read),
-  .read_dest(ctr_read_dest),
-  .ready(ready_ctr),
-  .empty(empty_ctr),
-  .wb(wb_ctr),
-  .delayed_commit(1'b0),
-  .delayed_dest('0),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-logic lnk_read[0:0];
-logic lnk_read_dest[0:0];
-
-assign lnk_read_dest[0] = 1'b0;
-assign lnk_read[0] = predec.read_lnk;
-
-Track #(
-  .DEST_SIZE(1),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages_short)
-) track_lnk (
-  .write(predec.write_lnk),
-  .dest(1'b0),
-  .read(lnk_read),
-  .read_dest(lnk_read_dest),
-  .ready(ready_lnk),
-  .empty(empty_lnk),
-  .wb(wb_lnk),
-  .delayed_commit(1'b0),
-  .delayed_dest('0),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-logic xer_read[0:0];
-logic[$bits(Xer_dest)-1:0] xer_read_dest[0:0];
-
-assign xer_read_dest[0] = XER_DEST_ALL;
-assign xer_read[0] = predec.read_xer;
-
-Track #(
-  .DEST_SIZE($bits(Xer_dest)),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages)
-) track_xer (
-  .write(predec.write_xer),
-  .dest(predec.xer_dest),
-  .read(xer_read),
-  .read_dest(xer_read_dest),
-  .ready(),
-  .empty(empty_xer),
-  .wb(wb_xer),
-  .delayed_commit(1'b0),
-  .delayed_dest({$bits(Xer_dest){1'b0}}),
-  .predec(predec),
-  .*
-);
-
-assign ready_xer = empty_xer;
-
-//---------------------------------------------------------------------------
-
-logic branch_read[0:0];
-logic branch_read_dest[0:0];
-
-assign branch_read[0] = 1'b0;
-assign branch_read_dest[0] = 1'b0;
-
-Track #(
-  .DEST_SIZE(1),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages_short)
-) track_branch (
-  .write(predec.is_branch),
-  .dest(1'b0),
-  .read(branch_read),
-  .read_dest(branch_read_dest),
-  .ready(),
-  .empty(empty_branch),
-  .wb(wb_branch_dummy.ctrl),
-  .delayed_commit(1'b0),
-  .delayed_dest('0),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-logic spr_read[0:1];
-logic[$bits(Spr_reduced)-1:0] spr_read_dest[0:1];
-
-assign 
-  spr_read[0] = predec.read_spr,
-  spr_read[1] = predec.read_spr2;
-
-assign
-  spr_read_dest[0] = predec.spr,
-  spr_read_dest[1] = predec.spr2;
-
-Track #(
-  .DEST_SIZE($bits(Spr_reduced)),
-  //.DEST_SIZE(10),
-  .NUM_TESTPORTS(2),
-  .SHREG_STAGES(shreg_stages_short)
-  //.USE_LOOKUP_CACHE(1'b0)
-) track_spr (
-  .write(predec.write_spr),
-  .dest(predec.spr_dest),
-  .read(spr_read),
-  .read_dest(spr_read_dest),
-  .ready(ready_spr),
-  .empty(empty_spr),
-  .wb(wb_spr),
-  .delayed_commit(1'b0),
-  .delayed_dest({$bits(Spr_reduced){1'b0}}),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-logic mem_read[0:0];
-logic[0:0] mem_read_dest[0:0];
-
-assign mem_read[0] = 1'b0;
-assign mem_read_dest[0] = 1'b1;
-
-// XXX I think this is only needed for the MEM_TIGHT case
-Track #(
-  .DEST_SIZE(1),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages_short),
-  .USE_LOOKUP_CACHE(LOOKUP_CACHE)
-) track_mem (
-  .write(predec.write_mem),
-  .dest(1'b1),
-  .read(mem_read),
-  .read_dest(mem_read_dest),
-  .ready(),
-  .empty(empty_mem),
-  .wb(wb_mem_dummy.ctrl),
-  .delayed_commit(1'b0),
-  .delayed_dest('0),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-/*logic nve_read[0:0];
-logic[0:0] nve_read_dest[0:0];
-
-assign nve_read[0] = 1'b0;
-assign nve_read_dest[0] = 1'b1;
-
-Track #(
-  .DEST_SIZE(1),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages_short),
-  .USE_LOOKUP_CACHE(1'b1)
-) track_nve (
-  .write(predec.write_nve),
-  .dest(1'b1),
-  .read(nve_read),
-  .read_dest(nve_read_dest),
-  .ready(),
-  .empty(empty_nve),
-  .wb(wb_nve_dummy.ctrl),
-  .delayed_commit(1'b0),
-  .delayed_dest('0),
-  .*
-);*/
-
-
-//---------------------------------------------------------------------------
-
-logic msr_read[0:0];
-logic msr_read_dest[0:0];
-
-assign msr_read_dest[0] = 1'b0;
-assign msr_read[0] = predec.read_msr;
-
-Track #(
-  .DEST_SIZE(1),
-  .NUM_TESTPORTS(1),
-  .SHREG_STAGES(shreg_stages_short)
-) track_msr (
-  .write(predec.write_msr),
-  .dest(1'b0),
-  .read(msr_read),
-  .read_dest(msr_read_dest),
-  .ready(ready_msr),
-  .empty(empty_msr),
-  .wb(wb_msr),
-  .delayed_commit(1'b0),
-  .delayed_dest('0),
-  .predec(predec),
-  .*
-);
-
-//---------------------------------------------------------------------------
-
-//---------------------------------------------------------------------------
-// Delayed WB feature: Hold writes referring to a register in delayed
-// write-back.
-//---------------------------------------------------------------------------
-
-/*Lookup_cache #(.SIZE(32)) ls_gpr_delayed_write_test_write (
-  .clk, .reset,
-  .set_addr(wbd_ls_gpr.track_dest),
-  .set(wbd_ls_gpr.track_valid),
-  .clear_addr(wbd_ls_gpr.wb_dest),
-  .clear(wbd_ls_gpr.wb_ack & wbd_ls_gpr.wb_req),
-  .test_addr(gpr_dest),
-  .found(found_ls_gpr_delayed_w)
-);*/
-
-//assign ready_ls_gpr_delayed = (~(found_ls_gpr_delayed_w & gpr_write));
-
-endmodule
-
-
-//---------------------------------------------------------------------------
-// Submodule
-//---------------------------------------------------------------------------
 
 module Track
   #( parameter int DEST_SIZE = 5,
@@ -483,8 +33,11 @@ module Track
     input logic delayed_commit,
     input logic[DEST_SIZE-1:0] delayed_dest );
 
-
-  localparam int NUM_SHR_TESTPORTS = USE_LOOKUP_CACHE ? 0 : NUM_TESTPORTS;
+  `ifndef VERILATOR
+   localparam int              NUM_SHR_TESTPORTS = USE_LOOKUP_CACHE ? 0 : NUM_TESTPORTS;
+  `else
+   localparam int              NUM_SHR_TESTPORTS = USE_LOOKUP_CACHE ? 1 : NUM_TESTPORTS;
+  `endif
   localparam bit SHR_DETECT_WAW = !USE_LOOKUP_CACHE;
   localparam int SHR_STAGE_TEST_LOW = WRITE_THROUGH ? 2 : 1;
   //localparam int SHR_STAGE_TEST_LOW = WRITE_THROUGH ? 1 : 0;  // XXX latency performance bug
@@ -619,7 +172,7 @@ module Track
 
     genvar port;
     for(port=0; port<NUM_TESTPORTS; port++) begin : gen_port
-      
+
       Lookup_cache #(
         .SIZE(2**DEST_SIZE),
         .WRITE_THROUGH(WRITE_THROUGH),
@@ -649,7 +202,7 @@ module Track
   end : gen_lookup_cache
   else
   begin : no_lookup_cache
-    
+
     assign test = read_dest;
 
     always_comb begin
@@ -666,11 +219,651 @@ module Track
       ( delayed_commit == 1'b0 )
     );
     `endif /** SYNTHESIS */
-    
+
   end : no_lookup_cache
   endgenerate
 
 endmodule
+
+
+module Inst_track
+  #(parameter bit WRITE_THROUGH = 1'b1,
+    parameter bit LOOKUP_CACHE = 1'b1 )
+  ( input logic clk, reset,
+    
+    input Frontend::Fetch_state fst,
+    input Frontend::Predecoded predec,
+    
+    input disable_wb,
+
+    output logic ready,
+    output logic pipe_empty,
+    input logic issue,
+    Wb_channel_if.ctrl wb_gpr,
+    Wb_channel_if.ctrl wb_cr,
+    Wb_channel_if.ctrl wb_ctr,
+    Wb_channel_if.ctrl wb_lnk,
+    Wb_channel_if.ctrl wb_xer,
+    Wb_channel_if.ctrl wb_spr,
+    Wb_channel_if.ctrl wb_msr,
+
+    input Frontend::Delayed_commit del_commit );
+    
+import Frontend::*;
+import Pu_types::*;
+
+
+
+
+
+    //Delayed_wb_if.inst_track wbd_ls_gpr );
+
+//---------------------------------------------------------------------------
+// Local types and signals
+//---------------------------------------------------------------------------
+
+localparam int shreg_stages = $bits(Inst_latency_onehot);
+localparam int shreg_stages_short = 4;
+
+Wb_channel_if wb_branch_dummy();
+Wb_channel_if wb_mem_dummy();
+Wb_channel_if wb_nve_dummy();
+
+logic shift;
+Reg_index ra, rb, rt;
+logic ready_gpr;
+logic ready_cr;
+logic ready_ctr;
+logic ready_lnk;
+logic ready_xer;
+logic ready_spr;
+logic ready_msr;
+//logic ready_ls_gpr_delayed;
+logic empty_gpr;
+logic empty_cr;
+logic empty_ctr;
+logic empty_lnk;
+logic empty_xer;
+logic empty_spr;
+logic empty_branch;
+logic empty_mem;
+logic empty_nve;
+logic empty_msr;
+
+logic found_ls_gpr_delayed_w;
+logic ready_ls_gpr_delayed_r[0:2];
+
+logic schedule_wb;
+
+
+assign shift = 1'b1;
+assign
+  ra = predec.ra,
+  rb = predec.rb,
+  rt = predec.rt;
+assign schedule_wb = ~predec.nd_latency;
+
+assign ready = ready_gpr 
+  & ready_cr 
+  & ready_ctr 
+  & ready_lnk 
+  & ready_xer
+  & ready_spr
+  & ready_msr;
+  //& ready_ls_gpr_delayed;
+
+assign pipe_empty = empty_gpr 
+  & empty_cr 
+  & empty_ctr 
+  & empty_lnk 
+  & empty_branch 
+  & empty_xer
+  & empty_spr
+  & empty_mem
+  //& empty_nve
+  & empty_msr;
+
+//---------------------------------------------------------------------------
+// XXX instruction delay counter to force execution in program order.
+// Alternatively implement this as a shift register.
+// (Perhaps make it configurable whether this is used.)
+//---------------------------------------------------------------------------
+
+
+//---------------------------------------------------------------------------
+// Result shift registers for write-back channels
+//---------------------------------------------------------------------------
+
+logic gpr_write;
+Reg_index gpr_dest;
+logic gpr_read[0:2];
+Reg_index gpr_read_dest[0:2];
+
+assign 
+  gpr_read_dest[0] = predec.ra,
+  gpr_read_dest[1] = predec.rb,
+  gpr_read_dest[2] = predec.rt;
+assign 
+  gpr_read[0] = predec.read_ra,
+  gpr_read[1] = predec.read_rb,
+  gpr_read[2] = predec.read_rt;
+
+assign gpr_write = (predec.write_ra | predec.write_rt);
+assign gpr_dest = predec.write_ra ? predec.ra : predec.rt;
+
+Track #(
+  .DEST_SIZE($bits(Reg_index)),
+  .NUM_TESTPORTS(3),
+  .SHREG_STAGES(shreg_stages),
+  .WRITE_THROUGH(WRITE_THROUGH),
+  //.WRITE_THROUGH(1'b0),
+  .USE_LOOKUP_CACHE(LOOKUP_CACHE)
+) track_gpr (
+  .write(gpr_write),
+  .dest(gpr_dest),
+  .read(gpr_read),
+  .read_dest(gpr_read_dest),
+  .ready(ready_gpr),
+  .empty(empty_gpr),
+  .wb(wb_gpr.ctrl),
+  .delayed_commit(del_commit.valid),
+  .delayed_dest(del_commit.gpr),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+wire [0:7] ready_crf;
+wire [0:7] empty_crf;
+wire [0:7] wb_crf_we;
+Fu_set wb_crf_src[0:7];
+
+Wb_channel_if #(1) wb_crf0 ();
+Wb_channel_if #(1) wb_crf1 ();
+Wb_channel_if #(1) wb_crf2 ();
+Wb_channel_if #(1) wb_crf3 ();
+Wb_channel_if #(1) wb_crf4 ();
+Wb_channel_if #(1) wb_crf5 ();
+Wb_channel_if #(1) wb_crf6 ();
+Wb_channel_if #(1) wb_crf7 ();
+
+
+
+logic      cr_read[0:7];
+logic     cr_read_dest[0:7];
+
+assign cr_read[0] = predec.read_cr_0[0]
+     | predec.read_cr_1[0]
+     | predec.read_cr_2[0];
+   assign cr_read[1] = predec.read_cr_0[1]
+     | predec.read_cr_1[1]
+     | predec.read_cr_2[1];
+   assign cr_read[2] = predec.read_cr_0[2]
+     | predec.read_cr_1[2]
+     | predec.read_cr_2[2];
+   assign cr_read[0] = predec.read_cr_0[3]
+     | predec.read_cr_1[3]
+     | predec.read_cr_2[3];
+   assign cr_read[0] = predec.read_cr_0[4]
+     | predec.read_cr_1[4]
+     | predec.read_cr_2[4];
+   assign cr_read[0] = predec.read_cr_0[5]
+     | predec.read_cr_1[5]
+     | predec.read_cr_2[5];
+   assign cr_read[0] = predec.read_cr_0[6]
+     | predec.read_cr_1[6]
+     | predec.read_cr_2[6];
+   assign cr_read[0] = predec.read_cr_0[7]
+     | predec.read_cr_1[7]
+     | predec.read_cr_2[7];
+   assign cr_read_dest[0] = 1'b1;
+   assign cr_read_dest[1] = 1'b1;
+   assign cr_read_dest[2] = 1'b1;
+   assign cr_read_dest[3] = 1'b1;
+   assign cr_read_dest[4] = 1'b1;
+   assign cr_read_dest[5] = 1'b1;
+   assign cr_read_dest[6] = 1'b1;
+   assign cr_read_dest[7] = 1'b1;
+
+Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf0 (
+                        .write( (| predec.write_cr) ),
+                        .dest(predec.write_cr[0]),
+                        .read(cr_read[0]),
+                        .read_dest(cr_read_dest[0]),
+                        .ready(ready_crf[0]),
+                        .empty(empty_crf[0]),
+                        .wb(wb_crf0.ctrl),
+                        // .wb(wb_crf.ctrl),
+                        .delayed_commit(1'b0),
+                        .delayed_dest('0),
+                        .predec(predec),
+                        .*
+                        );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf1 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[1]),
+                         .read(cr_read[1]),
+                         .read_dest(cr_read_dest[1]),
+                         .ready(ready_crf[1]),
+                         .empty(empty_crf[1]),
+                         .wb(wb_crf1.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf2 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[2]),
+                         .read(cr_read[2]),
+                         .read_dest(cr_read_dest[2]),
+                         .ready(ready_crf[2]),
+                         .empty(empty_crf[2]),
+                         .wb(wb_crf2.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf3 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[3]),
+                         .read(cr_read[3]),
+                         .read_dest(cr_read_dest[3]),
+                         .ready(ready_crf[3]),
+                         .empty(empty_crf[3]),
+                         .wb(wb_crf3.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf4 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[4]),
+                         .read(cr_read[4]),
+                         .read_dest(cr_read_dest[4]),
+                         .ready(ready_crf[4]),
+                         .empty(empty_crf[4]),
+                         .wb(wb_crf4.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf5 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[5]),
+                         .read(cr_read[5]),
+                         .read_dest(cr_read_dest[5]),
+                         .ready(ready_crf[5]),
+                         .empty(empty_crf[5]),
+                         .wb(wb_crf5.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf6 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[6]),
+                         .read(cr_read[6]),
+                         .read_dest(cr_read_dest[6]),
+                         .ready(ready_crf[6]),
+                         .empty(empty_crf[6]),
+                         .wb(wb_crf6.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+   Track #(
+           .DEST_SIZE(1),
+           .NUM_TESTPORTS(1),
+           .SHREG_STAGES(shreg_stages)
+           ) track_crf7 (
+                         .write( (| predec.write_cr) ),
+                         .dest(predec.write_cr[7]),
+                         .read(cr_read[7]),
+                         .read_dest(cr_read_dest[7]),
+                         .ready(ready_crf[7]),
+                         .empty(empty_crf[7]),
+                         .wb(wb_crf7.ctrl),
+                         // .wb(wb_crf.ctrl),
+                         .delayed_commit(1'b0),
+                         .delayed_dest('0),
+                         .predec(predec),
+                         .*
+                         );
+
+
+
+   assign wb_crf_we[0] = wb_crf0.we;
+   assign wb_crf_we[1] = wb_crf1.we;
+   assign wb_crf_we[2] = wb_crf2.we;
+   assign wb_crf_we[3] = wb_crf3.we;
+   assign wb_crf_we[4] = wb_crf4.we;
+   assign wb_crf_we[5] = wb_crf5.we;
+   assign wb_crf_we[6] = wb_crf6.we;
+   assign wb_crf_we[7] = wb_crf7.we;
+
+   assign wb_crf_src[0] = wb_crf0.src;
+   assign wb_crf_src[1] = wb_crf1.src;
+   assign wb_crf_src[2] = wb_crf2.src;
+   assign wb_crf_src[3] = wb_crf3.src;
+   assign wb_crf_src[4] = wb_crf4.src;
+   assign wb_crf_src[5] = wb_crf5.src;
+   assign wb_crf_src[6] = wb_crf6.src;
+   assign wb_crf_src[7] = wb_crf7.src;
+
+   assign wb_cr.dest[0] = wb_crf0.dest;
+   assign wb_cr.dest[1] = wb_crf1.dest;
+   assign wb_cr.dest[2] = wb_crf2.dest;
+   assign wb_cr.dest[3] = wb_crf3.dest;
+   assign wb_cr.dest[4] = wb_crf4.dest;
+   assign wb_cr.dest[5] = wb_crf5.dest;
+   assign wb_cr.dest[6] = wb_crf6.dest;
+   assign wb_cr.dest[7] = wb_crf7.dest;
+
+   assign ready_cr = (& ready_crf);
+   assign empty_cr = (& empty_crf);
+
+  /** control write back channel for CR */
+always_comb begin
+   wb_cr.src = wb_crf_src[0];
+   wb_cr.we = wb_crf_we[0] | wb_crf_we[1] | wb_crf_we[2] | wb_crf_we[3]
+     | wb_crf_we[4] | wb_crf_we[5] | wb_crf_we[6] | wb_crf_we[7];
+end
+
+
+
+//---------------------------------------------------------------------------
+
+logic ctr_read[0:0];
+logic ctr_read_dest[0:0];
+
+assign ctr_read_dest[0] = 1'b0;
+assign ctr_read[0] = predec.read_ctr;
+
+Track #(
+  .DEST_SIZE(1),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages_short)
+) track_ctr (
+  .write(predec.write_ctr),
+  .dest(1'b0),
+  .read(ctr_read),
+  .read_dest(ctr_read_dest),
+  .ready(ready_ctr),
+  .empty(empty_ctr),
+  .wb(wb_ctr.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest('0),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+logic lnk_read[0:0];
+logic lnk_read_dest[0:0];
+
+assign lnk_read_dest[0] = 1'b0;
+assign lnk_read[0] = predec.read_lnk;
+
+Track #(
+  .DEST_SIZE(1),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages_short)
+) track_lnk (
+  .write(predec.write_lnk),
+  .dest(1'b0),
+  .read(lnk_read),
+  .read_dest(lnk_read_dest),
+  .ready(ready_lnk),
+  .empty(empty_lnk),
+  .wb(wb_lnk.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest('0),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+logic xer_read[0:0];
+logic[$bits(Xer_dest)-1:0] xer_read_dest[0:0];
+
+assign xer_read_dest[0] = XER_DEST_ALL;
+assign xer_read[0] = predec.read_xer;
+
+Track #(
+  .DEST_SIZE($bits(Xer_dest)),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages)
+) track_xer (
+  .write(predec.write_xer),
+  .dest(predec.xer_dest),
+  .read(xer_read),
+  .read_dest(xer_read_dest),
+  .ready(),
+  .empty(empty_xer),
+  .wb(wb_xer.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest({$bits(Xer_dest){1'b0}}),
+  .predec(predec),
+  .*
+);
+
+assign ready_xer = empty_xer;
+
+//---------------------------------------------------------------------------
+
+logic branch_read[0:0];
+logic branch_read_dest[0:0];
+
+assign branch_read[0] = 1'b0;
+assign branch_read_dest[0] = 1'b0;
+
+Track #(
+  .DEST_SIZE(1),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages_short)
+) track_branch (
+  .write(predec.is_branch),
+  .dest(1'b0),
+  .read(branch_read),
+  .read_dest(branch_read_dest),
+  .ready(),
+  .empty(empty_branch),
+  .wb(wb_branch_dummy.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest('0),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+logic spr_read[0:1];
+logic[$bits(Spr_reduced)-1:0] spr_read_dest[0:1];
+
+assign 
+  spr_read[0] = predec.read_spr,
+  spr_read[1] = predec.read_spr2;
+
+assign
+  spr_read_dest[0] = predec.spr,
+  spr_read_dest[1] = predec.spr2;
+
+Track #(
+  .DEST_SIZE($bits(Spr_reduced)),
+  //.DEST_SIZE(10),
+  .NUM_TESTPORTS(2),
+  .SHREG_STAGES(shreg_stages_short)
+  //.USE_LOOKUP_CACHE(1'b0)
+) track_spr (
+  .write(predec.write_spr),
+  .dest(predec.spr_dest),
+  .read(spr_read),
+  .read_dest(spr_read_dest),
+  .ready(ready_spr),
+  .empty(empty_spr),
+  .wb(wb_spr.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest({$bits(Spr_reduced){1'b0}}),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+logic mem_read[0:0];
+logic[0:0] mem_read_dest[0:0];
+
+assign mem_read[0] = 1'b0;
+assign mem_read_dest[0] = 1'b1;
+
+// XXX I think this is only needed for the MEM_TIGHT case
+Track #(
+  .DEST_SIZE(1),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages_short),
+  .USE_LOOKUP_CACHE(LOOKUP_CACHE)
+) track_mem (
+  .write(predec.write_mem),
+  .dest(1'b1),
+  .read(mem_read),
+  .read_dest(mem_read_dest),
+  .ready(),
+  .empty(empty_mem),
+  .wb(wb_mem_dummy.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest('0),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+/*logic nve_read[0:0];
+logic[0:0] nve_read_dest[0:0];
+
+assign nve_read[0] = 1'b0;
+assign nve_read_dest[0] = 1'b1;
+
+Track #(
+  .DEST_SIZE(1),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages_short),
+  .USE_LOOKUP_CACHE(1'b1)
+) track_nve (
+  .write(predec.write_nve),
+  .dest(1'b1),
+  .read(nve_read),
+  .read_dest(nve_read_dest),
+  .ready(),
+  .empty(empty_nve),
+  .wb(wb_nve_dummy.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest('0),
+  .*
+);*/
+
+
+//---------------------------------------------------------------------------
+
+logic msr_read[0:0];
+logic msr_read_dest[0:0];
+
+assign msr_read_dest[0] = 1'b0;
+assign msr_read[0] = predec.read_msr;
+
+Track #(
+  .DEST_SIZE(1),
+  .NUM_TESTPORTS(1),
+  .SHREG_STAGES(shreg_stages_short)
+) track_msr (
+  .write(predec.write_msr),
+  .dest(1'b0),
+  .read(msr_read),
+  .read_dest(msr_read_dest),
+  .ready(ready_msr),
+  .empty(empty_msr),
+  .wb(wb_msr.ctrl),
+  .delayed_commit(1'b0),
+  .delayed_dest('0),
+  .predec(predec),
+  .*
+);
+
+//---------------------------------------------------------------------------
+
+//---------------------------------------------------------------------------
+// Delayed WB feature: Hold writes referring to a register in delayed
+// write-back.
+//---------------------------------------------------------------------------
+
+/*Lookup_cache #(.SIZE(32)) ls_gpr_delayed_write_test_write (
+  .clk, .reset,
+  .set_addr(wbd_ls_gpr.track_dest),
+  .set(wbd_ls_gpr.track_valid),
+  .clear_addr(wbd_ls_gpr.wb_dest),
+  .clear(wbd_ls_gpr.wb_ack & wbd_ls_gpr.wb_req),
+  .test_addr(gpr_dest),
+  .found(found_ls_gpr_delayed_w)
+);*/
+
+//assign ready_ls_gpr_delayed = (~(found_ls_gpr_delayed_w & gpr_write));
+
+endmodule
+
+
+//---------------------------------------------------------------------------
+// Submodule
+//---------------------------------------------------------------------------
 
 
 

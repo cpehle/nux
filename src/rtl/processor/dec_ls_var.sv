@@ -240,6 +240,7 @@ end else begin
   end
 end
 
+`ifndef VERILATOR
 `ifndef SYNTHESIS
 
   assert property(
@@ -248,6 +249,7 @@ end
   );
 
 `endif /* SYNTHESIS */
+`endif
 
 endmodule
 

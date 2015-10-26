@@ -25,12 +25,7 @@ interface Alu_data_if;
 		cin = 1'b0;
 	endtask*/
 
-	modport decode
-		(	//import decode_set_zero,
-			output .a(ina), 
-			output .b(inb),
-			output cin, cr );
-
+	modport decode(output .a(ina), output .b(inb), output cin, cr );
 	modport alu(input .a(outa), input .b(outb), input cin, cr);
 	modport bypass(input ina, inb, output outa, outb);
 endinterface

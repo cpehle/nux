@@ -24,8 +24,9 @@ module Syn_io_dummy
     end else begin
       if( syn_io.start ) begin
         syn_io.busy <= 1'b1;
-        for(int i=0; i<10; i++)
+        for(int i=0; i<10; i++) begin
           @(posedge clk);
+        end
 
         syn_io.syn2client_valid <= 1'b1;
         syn_io.syn2client_data <= {4{32'haffe_affe}};

@@ -453,6 +453,7 @@ Fubm_synapse fubm_synapse (
 
   //---------------------------------------------------------------------------
   /** Instructions should only be scheduled to one issue slot. */
+ `ifndef VERILATOR
   property schedule_to_one_slot;
     @(posedge clk) disable iff (reset)
     ( $onehot0({issue_slots_i[0].valid, 
@@ -473,6 +474,8 @@ Fubm_synapse fubm_synapse (
   endproperty
 
   check_issued_slot_is_ready: assert property(issued_slot_is_ready);
+ `endif //  `ifndef VERILATOR
+
   //---------------------------------------------------------------------------
   /** All instructions should be issued at some point (except wait) */
   /*property issue_all;

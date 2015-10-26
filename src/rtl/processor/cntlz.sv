@@ -7,8 +7,6 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See
 // the License for the specific language governing permissions and limitations
 // under the License.
-
-
 module Cntlz
   ( input Pu_types::Word x,
     output Pu_types::Word y,
@@ -23,7 +21,7 @@ logic[addr_width-1:0] cnt;
 
 //`include "DW_lzd_function.inc"
 
-DW_lzd #(a_width) lzd ( .a(x), .dec(), .enc(cnt) );
+// DW_lzd #(a_width) lzd ( .a(x), .dec(), .enc(cnt) );
 
 //assign cnt = DWF_lzd_enc(x);
 assign y = (cnt[addr_width-1] == 1'b1) ? 32'h20 : { {DWIDTH-addr_width{1'b0}}, cnt };

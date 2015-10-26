@@ -148,6 +148,7 @@ always_comb begin
   resbus.valid = res_valid;
 end
 
+`ifndef VERILATOR
 `ifndef SYNTHESIS
   /* Test that no alignment exceptions occur. */
   check_alignment: assert property (
@@ -155,7 +156,7 @@ end
     ( !except_align )
   ) else $error("Alignment error on bus access -> Access is not executed.");
 `endif /** SYNTHESIS */
-
+`endif
 
 endmodule
 

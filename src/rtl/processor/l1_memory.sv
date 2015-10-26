@@ -8,8 +8,7 @@
 // the License for the specific language governing permissions and limitations
 // under the License.
 
-
-/** Level-1 memory 
+/** Level-1 memory
  *
  * Synchronous memory with byte-enable. Inferred as BlockRAM on Xilinx FPGAs.
  * If IS_DUALPORT is set, intf2 is a valid interface with same address and
@@ -115,104 +114,103 @@ module L1_memory
 	generate
 		genvar i;
 		for(i=0; i<BYTE_COUNT; ++i) begin : bank
-			logic[7:0] mem[0:MEM_SIZE-1];
-			//logic[7:0] data_r;
-			logic[7:0] data_w;
+           logic[7:0] mem[0:MEM_SIZE-1]/*verilator public*/;
+           //logic[7:0] data_r;
+           logic [7:0] data_w;
 
-			wire we;
-			
-			logic[7:0] data_w2;
-			wire we2;
+           wire        we;
 
-			assign we = intf.we & intf.be[i];
+           logic [7:0] data_w2;
+           wire        we2;
 
-			/** Generate byte-sized write data signals */
-			always_comb
-				for(int b=0; b<8; b++) begin
-					//intf.data_r[i*8+b] = data_r[b];
-					data_w[b] = intf.data_w[i*8+b];
-				end
+		   assign we = intf.we & intf.be[i];
 
-			/** Read/write process for one byte */
-			always @(posedge clk)
-			begin : rw_proc
+		   /** Generate byte-sized write data signals */
+           always_comb
+             for(int b=0; b<8; b++) begin
+                //intf.data_r[i*8+b] = data_r[b];
+                data_w[b] = intf.data_w[i*8+b];
+             end
+
+		   /** Read/write process for one byte */
+           always @(posedge clk)
+             begin : rw_proc
 				if( reset ) begin
-					data_r[i] <= 8'b0;
+                   data_r[i] <= 8'b0;
 				end else begin
-					if( intf.en ) begin
-						data_r[i] <= mem[intf.addr];
+                   if( intf.en ) begin
+                      data_r[i] <= mem[intf.addr];
 
-						if( we )
-							mem[intf.addr] <= data_w;
-					end
+					  if( we )
+                        mem[intf.addr] <= data_w;
+                   end
 
-					// doing the write of the second port here resolves
-					// write collisions
-					if( IS_DUALPORT ) begin : dual_port
-						if( intf2.en ) begin
-							data_r2[i] <= mem[intf2.addr];
+				   // doing the write of the second port here resolves
+                   // write collisions
+                   if( IS_DUALPORT ) begin : dual_port
+                      if( intf2.en ) begin
+                         data_r2[i] <= mem[intf2.addr];
 
-							if( we2 )
-								mem[intf2.addr] <= data_w2;
+                         if( we2 )
+                           mem[intf2.addr] <= data_w2;
 						end
-					end : dual_port
+                   end : dual_port
 				end
-			end : rw_proc
+             end : rw_proc
 
-			//
-			// second port
-			//
+           //
+           // second port
+           //
 			if( IS_DUALPORT == 1'b1 ) begin : dual_port
-				assign we2 = intf2.we & intf2.be[i];
+               assign we2 = intf2.we & intf2.be[i];
 
-				always_comb
+			   always_comb
 					for(int b=0; b<8; b++) begin
-						data_w2[b] = intf2.data_w[i*8+b];
+                       data_w2[b] = intf2.data_w[i*8+b];
 					end
-					
-				// doing the write here will lead to undeterministic behaviour
-				// for write-collisions. Also you need to add 
-				// syn_ramstyle = "no_rw_check" to mem.
-// 				always @(posedge clk)
-// 				begin
-// 					if( reset )
-// 						data_r2[i] <= 8'b0;
-// 					else begin
-// 						if( intf2.en ) begin
-// 							data_r2[i] <= mem[intf2.addr];
-// 							
-// 							if( we2 )
-// 								mem[intf2.addr] <= data_w2;
-// 						end
-// 					end
-// 				end
+
+               // doing the write here will lead to undeterministic behaviour
+               // for write-collisions. Also you need to add
+               // syn_ramstyle = "no_rw_check" to mem.
+               // 				always @(posedge clk)
+               // 				begin
+               // 					if( reset )
+               // 						data_r2[i] <= 8'b0;
+               // 					else begin
+               // 						if( intf2.en ) begin
+               // 							data_r2[i] <= mem[intf2.addr];
+               //
+               // 							if( we2 )
+               // 								mem[intf2.addr] <= data_w2;
+               // 						end
+               // 					end
+               // 				end
 
 			end : dual_port
 
 		end
 
 
-		if( IS_DUALPORT == 1'b1 ) begin : write_data_r2
+       if( IS_DUALPORT == 1'b1 ) begin : write_data_r2
 			/** reduce byte-size data_r from generate block to word-size data_r from
 			 * the interface */
-			always_comb
-				for(int by=0; by<BYTE_COUNT; by++)
-					for(int bi=0; bi<8; bi++)
-						intf2.data_r[by*8+bi] = data_r2[by][bi];
+           always_comb
+              for(int by=0; by<BYTE_COUNT; by++)
+                  for(int bi=0; bi<8; bi++)
+                    intf2.data_r[by*8+bi] = data_r2[by][bi];
 		end : write_data_r2
 	endgenerate
 
-	/** reduce byte-size data_r from generate block to word-size data_r from
-	 * the interface */
-	always_comb
-		for(int by=0; by<BYTE_COUNT; by++)
-			for(int bi=0; bi<8; bi++)
-				intf.data_r[by*8+bi] = data_r[by][bi];
+   /** reduce byte-size data_r from generate block to word-size data_r from
+    * the interface */
+   always_comb
+     for(int by=0; by<BYTE_COUNT; by++)
+       for(int bi=0; bi<8; bi++)
+         intf.data_r[by*8+bi] = data_r[by][bi];
 
-
-	assign 
-		intf.delay = 1'b0,
-		intf2.delay = 1'b0;
+   assign
+     intf.delay = 1'b0,
+     intf2.delay = 1'b0;
 
 // synopsys translate_on
 endmodule

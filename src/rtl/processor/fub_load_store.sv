@@ -34,7 +34,7 @@ Result_bus resbus_i;
 Dec_load_store decode (
   .clk, .reset,
   .inst,
-  .ctrl
+  .ctrl(ctrl.decode)
 );
 
 assign data_address = opbus.opbus_0.a + opbus.opbus_0.b;

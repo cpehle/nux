@@ -45,8 +45,9 @@ interface Ram_if
 			`ifdef SYNTOOL_SYNPLIFY
 			ref ADDR_WIDTH, DATA_WIDTH,
 			`endif  /* SYNTOOL_SYNPLIFY */
-
+			`ifndef VERILATOR
 			import addr_width, data_width,
+			`endif
 		 	input  en, addr, data_w, we, be,
 			output data_r,
 			output delay);
@@ -57,8 +58,9 @@ interface Ram_if
 			`ifdef SYNTOOL_SYNPLIFY
 			ref ADDR_WIDTH, DATA_WIDTH,
 			`endif  /* SYNTOOL_SYNPLIFY */
-
+		    `ifndef VERILATOR
 			import addr_width, data_width,
+			`endif
 		 	input  data_r,
 			input delay,
 			output en, addr, data_w, we, be );
@@ -66,7 +68,10 @@ interface Ram_if
 
 	/**! Modport for a monitor */
 	modport monitor
-		(	import addr_width, data_width,
+		(
+		 `ifndef VERILATOR
+			import addr_width, data_width,
+		 `endif
 			input en, addr, data_r, data_w, we, be, delay );	
 
 endinterface

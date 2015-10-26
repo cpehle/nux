@@ -12,12 +12,12 @@
 /** Definitions for exceptions handling and interrupt generation */
 package Pu_interrupt;
 	/** Type used to signal machine check exceptions */
-	typedef struct {
+	typedef struct packed {
 		logic mcheck;
 	} Except_mcheck;
 
 	/** Type used to signal critical exceptions */
-	typedef struct {
+	typedef struct packed {
 		// exceptions causing the critical input interrupt
 		logic cinput;
 
@@ -26,7 +26,7 @@ package Pu_interrupt;
 	} Except_critical;
 
 	/** Type used to signal base exceptions */
-	typedef struct {
+	typedef struct packed {
 		// exceptions causing data storage interrupt
 		//logic  d_access;
 
@@ -49,7 +49,7 @@ package Pu_interrupt;
 	} Except_base;
 
 
-	/** Interrupt vector fixed addresses 
+	/** Interrupt vector fixed addresses
 	*
 	* These are word addresses (therefore the right shift by two). */
 	// PowerISA 2.06 definitions -- start

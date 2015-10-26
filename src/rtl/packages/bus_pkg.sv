@@ -23,10 +23,14 @@ package Bus;
 	} Ocp_cmd;
 
 	typedef enum logic[1:0] {
-		NULL = 2'b00,
-		DVA  = 2'b01,
-		FAIL = 2'b10,
-		ERR  = 2'b11
+							 `ifndef VERILATOR
+							 NULL = 2'b00,
+							 `else
+							 NIL = 2'b00,
+							 `endif
+							 DVA  = 2'b01,
+							 FAIL = 2'b10,
+							 ERR  = 2'b11
 	} Ocp_resp;
 
 	function automatic int clog2(input int x);

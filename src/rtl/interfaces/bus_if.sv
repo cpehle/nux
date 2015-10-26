@@ -73,6 +73,7 @@ interface Bus_if
     output SCmdAccept, SData, SResp
   );
 
+  `ifndef VERILATOR
   `ifndef SYNTHESIS
 
   /** Request data must stay stable until SCmdAccept is asserted. */
@@ -144,7 +145,8 @@ interface Bus_if
   //) else
     //$error("Response without matching request was received");
   //---------------------------------------------------------------------------
-  `endif  /* SYNTHESIS */
+ `endif  /* SYNTHESIS */
+ `endif //  `ifndef VERILATOR
 endinterface
 
 
