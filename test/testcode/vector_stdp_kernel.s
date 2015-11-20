@@ -48,7 +48,7 @@ stdp_kernel:
 	fxvcmph 1            # vcr <- cmp(a(1))
 	fxvsubhm 2, 31, 0    # u(2) <- wmax(31) - w(0)
 	fxvmulhm 3, 29, 0    # v(3) <- c(29) * w(0)
-	fxvmtac 0            # acc <- w(0)
+	fxvmtach 0            # acc <- w(0)
 	fxvmahm 0, 1, 2, 1   # w(0) <- a(1) * u(2) + acc if vcr.gt
 	fxvmahm 0, 1, 3, 2   # w(0) <- a(1) * v(3) + acc if vcr.lt
 	                     # w(0) now contains:
