@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
         int expected_bin = open(argv[3], O_RDONLY);
 
         if (instructions_bin < 0 || data_bin < 0 || expected_bin < 0) {
-                return 1;
+                exit(1);
         }
 
         top->trace(tfp, 99);
@@ -52,12 +52,12 @@ int main(int argc, char **argv) {
         fstat(instructions_bin, &ib_st);
         fstat(instructions_bin, &db_st);
 
-        // unsigned int* instruction = (unsigned int*)mmap(NULL, ib_st.st_size,  PROT_READ, MAP_FILE | MAP_SHARED, instructions_bin, 0);
-        // unsigned int* data = (unsigned int*)mmap(NULL, db_st.st_size,  PROT_READ, MAP_FILE | MAP_SHARED, data_bin, 0);
+        unsigned int* instruction = (unsigned int*)mmap(NULL, ib_st.st_size,  PROT_READ, MAP_FILE | MAP_SHARED, instructions_bin, 0);
+        unsigned int* data = (unsigned int*)mmap(NULL, db_st.st_size,  PROT_READ, MAP_FILE | MAP_SHARED, data_bin, 0);
 
-        unsigned int instruction[] = {0x80600000, 0x80800004, 0x7CA32214, 0x90A00008, 0x7C00007C
-};
-        unsigned int data[] = {0xf, 0x2, 0x0};
+        //unsigned int instruction[] = {0x80600000, 0x80800004, 0x7CA32214, 0x90A00008, 0x7C00007C
+        //};
+        //unsigned int data[] = {0xf, 0x2, 0x0};
 
         if (instruction== MAP_FAILED || data == MAP_FAILED)  {
                 return 1;
@@ -75,6 +75,7 @@ int main(int argc, char **argv) {
         top->v->imem->bank__BRA__2__KET____DOT__mem[i] = instruction[i] >> 16;
         top->v->imem->bank__BRA__3__KET____DOT__mem[i] = instruction[i] >> 24;
         }
+
 
 
         for (int i=0; i<1000; i++) {
