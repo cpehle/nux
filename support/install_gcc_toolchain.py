@@ -39,3 +39,4 @@ os.chdir(basedir)
 for src in sources:
     subprocess.run(["rm", src['filename']])
 subprocess.run(["rm -r", "_build", "gcc-4.9.2/", "binutils-2.25/"])
+print("Done")

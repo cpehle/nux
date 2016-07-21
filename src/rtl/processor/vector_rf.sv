@@ -8,7 +8,9 @@
 // the License for the specific language governing permissions and limitations
 // under the License.
 
-
+/// @file vector_rf.sv
+/// @author Simon Friedmann
+/// @brief vector register file
 module Vector_rf 
   #(parameter int NUM_ELEMS = 8,
     parameter int ELEM_SIZE = 16,

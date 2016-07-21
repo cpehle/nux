@@ -21,7 +21,7 @@ omnibus = bus_master_terminator.sv
 m4dir = m4out/
 
 all: $(m4files)
-	verilator -trace --CFLAGS "-g" -DSYNTHESIS --top-module top -Wno-fatal -Wall --exe sim.cpp -y ../../omnibus/src/modules/ -y ../../src/rtl/processor -y ../../src/rtl/include -y ../../src/rtl/packages -y ../../src/rtl/interfaces --cc $(packages) $(interfaces) $(m4files)  $(omnibus) $(processor) top.sv
+	verilator -trace --CFLAGS "-g" -DSYNTHESIS --top-module top -Wno-fatal -Wall --exe dut_top.cpp -y ../../omnibus/src/modules/ -y ../../src/rtl/processor -y ../../src/rtl/include -y ../../src/rtl/packages -y ../../src/rtl/interfaces --cc $(packages) $(interfaces) $(m4files)  $(omnibus) $(processor) top.sv
 	cd obj_dir && make -f Vtop.mk
 
 m4out/%.preproc.sv: ../../src/rtl/processor/%.sv

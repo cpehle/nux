@@ -19,7 +19,7 @@ RESULT_SYM=--defsym RESULT=1
 OBJCOPY_FLAGS=-O binary
 
 
-RAW_PROGRAMS=fxv_test vector_stdp_kernel sync
+RAW_PROGRAMS=fxv_test vector_stdp_kernel sync load_add_store
 
 
 .PHONY: all

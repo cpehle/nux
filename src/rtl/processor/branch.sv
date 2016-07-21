@@ -38,7 +38,7 @@ end : decrement_counter
 
 assign cond_ok = ctrl.mask_cond 
     || (data.cr[31-ctrl.crbi] == ctrl.cond);
-assign ctr_ok = ctrl.mask_ctr 
+ assign ctr_ok = ctrl.mask_ctr
     | ((ctr != 0) ^ ctrl.ctr_eq);
 
 

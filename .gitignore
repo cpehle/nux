@@ -107,3 +107,4 @@ verification/*/build
 target/*/build
 results/*
 *.elab
+obj_dir/**
